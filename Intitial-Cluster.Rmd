@@ -1,0 +1,69 @@
+---
+title: "Seahawks Intitial Cluster"
+author: "Sam Ricafrente"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+library(readxl)
+library(cluster)
+library(caret)
+```
+
+```{r}
+stnl <- read.csv("C:/Users/bri_r/OneDrive/Documents/GitHub/Seahawks/stnl_clean.csv")
+```
+
+```{r}
+# Remove columns with zero or near-zero variance
+stnl_filtered <- stnl[, nearZeroVar(stnl, saveMetrics = TRUE)$nzv == FALSE]
+```
+
+```{r}
+# Get the indices of near-zero variance columns
+nzv_indices <- nearZeroVar(stnl, saveMetrics = TRUE)
+
+# View details of filtered columns
+filtered_columns <- nzv_indices[nzv_indices$nzv == TRUE, ]
+
+# Print the names and metrics of the filtered columns
+print(filtered_columns)
+```
+
+```{r}
+# View variables that were NOT filtered out
+kept_columns <- nzv_indices[nzv_indices$nzv == FALSE, ]
+print(kept_columns)
+```
+
+```{r}
+set.seed(1)
+
+stnl_scaled <- scale(stnl_filtered)
+
+# Use pam() function to perform k-Means clustering
+kResult <- pam(stnl_scaled, k=3)
+summary(kResult)
+```
+
+```{r}
+# Show clusters
+plot(kResult)
+```
+
+```{r}
+set.seed(1)  # For consistent results
+kmeans_result <- kmeans(stnl_scaled, centers = 3, nstart = 25)
+print(kmeans_result)
+```
+
+```{r}
+library(factoextra)
+fviz_nbclust(stnl_scaled, kmeans, method = "wss")  # Elbow method
+```
+
+```{r}
+fviz_cluster(kmeans_result, data = stnl_scaled)
+```
+
