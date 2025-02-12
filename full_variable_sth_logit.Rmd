@@ -1,0 +1,140 @@
+---
+title: "Untitled"
+author: "Ryan Neely"
+date: "2025-02-05"
+output: html_document
+---
+
+```{r}
+library(readxl)
+library(dplyr)
+```
+
+```{r}
+lost_1 <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/Data_with_averages/all_variables_lost1_without_sth.csv")
+lost_2 <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/Data_with_averages/all_variables_lost2_without_sth.csv")
+lost_3 <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/Data_with_averages/all_variables_lost3_without_sth.csv")
+lost_4  <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/Data_with_averages/all_variables_lost4_without_sth.csv")
+lost_5 <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/Data_with_averages/all_variables_lost5_without_sth.csv")
+
+lost_df <- rbind(lost_1, lost_2, lost_3, lost_4, lost_5)
+
+```
+
+
+```{r}
+library(dplyr)
+
+bp_to_sth <- lost_df %>% 
+  filter(CAMPAIGN_LOST == "BP to STH")
+
+bp_to_sth$CONVERSION <- 0
+```
+
+
+```{r}
+sth_df <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/Data_with_averages/all_variables_sth_without_sth.csv")
+
+sth_df$CONVERSION <- 1
+
+```
+
+
+```{r}
+bp_to_sth <- bp_to_sth %>%
+  select(-CAMPAIGN_LOST)
+
+bp_to_sth <- bp_to_sth %>%
+  select(-c(Totals, year, month, LOB_SEAHAWKS, LOB_FGI, email_click, email_incoming_from_customer, email_outgoing_to_customer, initial_creation, page_view, ID, CUSTOMER_KEY, AVG_TIME_DAYS_purchase, survey_submission, email_open, email_send, email_sub, email_unsub))
+
+
+sth_df <- sth_df %>%
+  select(-c(Totals, LOB_SEAHAWKS, LOB_FGI, email_click, email_incoming_from_customer, email_outgoing_to_customer, initial_creation, page_view, ID, CUSTOMER_KEY, AVG_TIME_DAYS_purchase, forward_receipt, email_open, email_send, email_sub, email_unsub))
+
+
+
+full_sth <- rbind(bp_to_sth, sth_df)
+
+full_sth$CONVERSION <- as.factor(full_sth$CONVERSION)
+```
+
+
+```{r}
+full_sth_fill <- full_sth %>%
+    mutate(percent_open = ifelse(is.na(percent_open) | is.infinite(percent_open), 0, percent_open),
+         percent_click = ifelse(is.na(percent_click) | is.infinite(percent_click), 0, percent_click))
+```
+
+```{r}
+full_sth_fill_scale <- full_sth_fill
+
+full_sth_fill_scale[, -ncol(full_sth_fill_scale)] <- scale(full_sth_fill_scale[, -ncol(full_sth_fill_scale)])
+```
+
+```{r}
+sth_without_model <- glm(CONVERSION ~ ., data = full_sth_fill_scale, family = 'binomial')
+summary(sth_without_model)
+```
+
+
+
+```{r}
+library(dplyr)
+
+stnl_to_bp <- lost_df %>% 
+  filter(CAMPAIGN_LOST == "STNL to BP")
+
+stnl_to_bp$CONVERSION <- 0
+```
+
+```{r}
+bp_df <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/Data_with_averages/all_variables_bp_without_sth.csv")
+
+bp_df$CONVERSION <- 1
+```
+
+```{r}
+stnl_to_bp <- stnl_to_bp %>%
+  select(-CAMPAIGN_LOST)
+
+stnl_to_bp <- stnl_to_bp %>%
+  select(-c(Totals, year, month, LOB_SEAHAWKS, LOB_FGI, email_click, email_incoming_from_customer, email_outgoing_to_customer, initial_creation, page_view, ID, CUSTOMER_KEY, AVG_TIME_DAYS_purchase, email_open, email_send, email_sub, email_unsub))
+
+
+bp_df <- bp_df %>%
+  select(-c(Totals, year, month, LOB_SEAHAWKS, LOB_FGI, email_click, email_incoming_from_customer, email_outgoing_to_customer, initial_creation, page_view, ID, CUSTOMER_KEY, AVG_TIME_DAYS_purchase, forward_receipt, email_open, email_send, email_sub, email_unsub))
+
+
+
+full_bp <- rbind(stnl_to_bp, bp_df)
+
+full_bp$CONVERSION <- as.factor(full_bp$CONVERSION)
+```
+
+
+```{r}
+full_bp_fill <- full_bp %>%
+    mutate(percent_open = ifelse(is.na(percent_open) | is.infinite(percent_open), 0, percent_open),
+         percent_click = ifelse(is.na(percent_click) | is.infinite(percent_click), 0, percent_click))
+```
+
+```{r}
+full_bp_fill_scale <- full_bp_fill
+
+full_bp_fill_scale[, -ncol(full_bp_fill_scale)] <- scale(full_bp_fill_scale[, -ncol(full_bp_fill_scale)])
+```
+
+```{r}
+bp_model_logit <- glm(CONVERSION ~ ., data = full_bp_fill_scale, family = 'binomial')
+summary(bp_model_logit)
+```
+
+```{r}
+activity_averages_by_conversion <- full_sth_fill %>%
+  group_by(CONVERSION) %>%
+  summarise(across(everything(), mean, na.rm = TRUE))
+
+# View the result
+print(activity_averages_by_conversion)
+```
+
