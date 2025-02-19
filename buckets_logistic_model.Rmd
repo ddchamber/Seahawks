@@ -1,0 +1,152 @@
+---
+title: "Untitled"
+author: "Ryan Neely"
+date: "2025-02-18"
+output: html_document
+---
+
+```{r}
+library(readxl)
+library(dplyr)
+```
+
+```{r}
+lost_1 <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/GSB-503/lost1_without_sth_bucket(1).csv")
+lost_2 <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/GSB-503/lost2_without_sth_bucket(1).csv")
+lost_3 <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/GSB-503/lost3_without_sth_bucket(1).csv")
+lost_4  <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/GSB-503/lost4_without_sth_bucket(1).csv")
+lost_5 <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/GSB-503/lost5_without_sth_bucket(1).csv")
+
+lost_df <- rbind(lost_1, lost_2, lost_3, lost_4, lost_5)
+```
+
+```{r}
+bp_to_sth <- lost_df %>% 
+  filter(CAMPAIGN_LOST == "BP to STH")
+
+bp_to_sth$CONVERSION <- 0
+```
+
+```{r}
+sth_df <- read.csv("C:/Users/rtnee/OneDrive/Documents/503-Data/GSB-503/sth_without_sth_bucket(1).csv")
+
+sth_df$CONVERSION <- 1
+```
+
+```{r}
+bp_to_sth <- bp_to_sth %>%
+  select(-CAMPAIGN_LOST)
+
+bp_to_sth <- bp_to_sth %>%
+  select(-c(Totals, year, month, LOB_SEAHAWKS, LOB_FGI, email_click, email_incoming_from_customer, email_outgoing_to_customer, initial_creation, CUSTOMER_KEY, AVG_TIME_DAYS_purchase, survey_submission, email_open, email_send, email_sub, email_unsub, merch_purchase, primary_purchase_club, phonecall_outgoing_to_customer, secondary_sale, X200.800_purchase, X800._purchase))
+
+
+sth_df <- sth_df %>%
+  select(-c(Totals, LOB_SEAHAWKS, LOB_FGI, email_click, email_incoming_from_customer, email_outgoing_to_customer, initial_creation, CUSTOMER_KEY, AVG_TIME_DAYS_purchase, forward_receipt, email_open, email_send, email_sub, email_unsub, merch_purchase, primary_purchase_club, phonecall_outgoing_to_customer, secondary_sale, X200.800_purchase, X800._purchase))
+
+
+
+full_sth <- rbind(bp_to_sth, sth_df)
+
+full_sth$CONVERSION <- as.factor(full_sth$CONVERSION)
+```
+
+```{r}
+full_sth_fill <- full_sth %>%
+    mutate(percent_open = ifelse(is.na(percent_open) | is.infinite(percent_open), 0, percent_open),
+         percent_click = ifelse(is.na(percent_click) | is.infinite(percent_click), 0, percent_click))
+```
+
+```{r}
+full_sth_fill <- full_sth_fill %>%
+    mutate(Avg_Engagement_per_visit = ifelse(is.infinite(Avg_Engagement_per_visit), 0, Avg_Engagement_per_visit))
+```
+
+```{r}
+full_sth_fill_scale <- full_sth_fill
+
+full_sth_fill_scale[, -ncol(full_sth_fill_scale)] <- scale(full_sth_fill_scale[, -ncol(full_sth_fill_scale)])
+```
+
+```{r}
+bucket_model <- glm(CONVERSION ~ . + page_view*Avg_Engagement_per_visit, data = full_sth_fill_scale, family = 'binomial')
+
+
+summary(bucket_model)
+```
+
+```{r}
+library(caret)
+
+# 1️⃣ Get Model Predictions (Probabilities)
+predicted_probs <- predict(bucket_model, type = "response")
+
+# 2️⃣ Define a Sequence of Cutoffs
+cutoffs <- seq(0, 0.9, by = 0.01)  # Try cutoffs from 0.1 to 0.9
+
+# 3️⃣ Initialize DataFrame to Store Results
+results <- data.frame(Cutoff = numeric(), Accuracy = numeric(), Specificity = numeric())
+
+# 4️⃣ Loop Over Cutoffs and Calculate Metrics
+for (c in cutoffs) {
+  predicted_classes <- ifelse(predicted_probs > c, 1, 0)  # Convert probabilities to binary
+  
+  # Create confusion matrix
+  cm <- confusionMatrix(as.factor(predicted_classes), as.factor(full_sth_fill$CONVERSION))
+  
+  # Store Accuracy and Specificity
+  results <- rbind(results, data.frame(Cutoff = c, 
+                                       Accuracy = cm$overall["Accuracy"], 
+                                       Specificity = cm$byClass["Specificity"]))
+}
+
+# 5️⃣ Find the Best Cutoff for Maximum Specificity
+best_cutoff <- results$Cutoff[which.max(results$Specificity)]
+print(paste("Best Cutoff for Maximum Specificity:", best_cutoff))
+
+# 6️⃣ Plot Accuracy and Specificity vs. Cutoff
+library(ggplot2)
+ggplot(results, aes(x = Cutoff)) +
+  geom_line(aes(y = Accuracy, color = "Accuracy"), size = 1) +
+  geom_line(aes(y = Specificity, color = "Specificity"), size = 1) +
+  labs(title = "Accuracy & Specificity vs. Cutoff", y = "Score", x = "Cutoff") +
+  scale_color_manual(name = "Metric", values = c("Accuracy" = "blue", "Specificity" = "red")) +
+  theme_minimal()
+
+```
+```{r}
+predicted_probs <- predict(bucket_model, type = "response")
+
+# 3️⃣ Convert Probabilities to Binary Predictions (Threshold = 0.5)
+predicted_classes <- ifelse(predicted_probs > 0.1, 1, 0)
+
+# 4️⃣ Compute Accuracy
+accuracy <- mean(predicted_classes == full_sth_fill$CONVERSION)
+print(paste("Accuracy:", round(accuracy, 4)))  # Print accuracy score
+
+# 5️⃣ Generate Confusion Matrix for More Evaluation Metrics
+conf_matrix <- confusionMatrix(as.factor(predicted_classes), as.factor(full_sth_fill$CONVERSION))
+print(conf_matrix)
+```
+
+```{r}
+library(cluster)
+
+set.seed(2)
+
+mydata_scaled <- scale(full_sth_fill_probs)
+
+kResult2 = pam(mydata_scaled, k=3)
+summary(kResult2)
+
+plot(kResult2)
+
+
+aggregate(full_sth_fill_probs, by= list(cluster= kResult2$clustering), FUN=mean )
+```
+```{r}
+full_sth_fill_probs <- full_sth_fill %>%
+  mutate(Predicted_Probability = predicted_probs) %>%  # Add predicted probabilities
+  select(-CONVERSION)
+```
+
