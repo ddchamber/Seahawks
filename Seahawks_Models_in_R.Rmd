@@ -1,0 +1,78 @@
+---
+title: "Seahawks_Models_in_R"
+author: "Daniel Chamberlin"
+date: "2025-02-19"
+output: html_document
+---
+
+```{r}
+library(readxl)
+library(dplyr)
+```
+
+Read in data: (BP to STH)
+
+```{r}
+bp_to_sth <- read.csv("~/calpoly/BusinessAnalytics/GSB503HAWKS/data/mergeData/bp_to_sth_modelData.csv")
+
+bp_to_sth
+```
+
+Logistic Regression:
+
+```{r}
+# Ensure CONVERSION is a factor
+bp_to_sth$CONVERSION <- as.factor(bp_to_sth$CONVERSION)
+
+# Select only numeric columns for scaling
+numeric_vars <- bp_to_sth[, sapply(bp_to_sth, is.numeric)]
+
+# Scale only numeric variables
+scaled_numeric_vars <- scale(numeric_vars)
+
+# Combine the scaled numeric data with the categorical target variable
+bp_to_sth_scaled <- data.frame(scaled_numeric_vars, CONVERSION = bp_to_sth$CONVERSION)
+
+# Fit logistic regression model
+bp_to_sth_model <- glm(CONVERSION ~ ., data = bp_to_sth_scaled, family = 'binomial')
+
+# Summary of the model
+summary(bp_to_sth_model)
+
+```
+
+Predict:
+
+```{r}
+# Predict probabilities
+pred_probs <- predict(bp_to_sth_model, type = "response")
+
+# Convert probabilities to binary outcomes (using 0.5 as threshold)
+pred_class <- ifelse(pred_probs > 0.5, 1, 0)
+
+# Convert true labels to numeric (if they are factors)
+true_class <- as.numeric(bp_to_sth$CONVERSION) - 1  # Converts factor to 0/1
+
+```
+
+Confusion Matrix and Metrics:
+
+```{r}
+library(caret)
+
+# Create confusion matrix
+conf_matrix <- confusionMatrix(as.factor(pred_class), as.factor(true_class))
+print(conf_matrix)
+
+```
+
+Means of different conversion groups:
+
+```{r}
+# Compute means grouped by CONVERSION
+averages <- aggregate(. ~ CONVERSION, data = bp_to_sth, FUN = mean)
+
+# Print results
+print(averages)
+
+```
