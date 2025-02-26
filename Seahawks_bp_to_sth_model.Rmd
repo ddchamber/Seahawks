@@ -1,0 +1,122 @@
+---
+title: "Seahawks Logisitc Regression BP to STH"
+author: "S1"
+date: "2025-02-05"
+output: html_document
+---
+
+Load Dependencies
+
+```{r}
+library(readxl)
+library(dplyr)
+library(caret)
+library(corrplot)
+```
+
+Load in Data
+
+```{r}
+bp_to_sth <- read.csv("~/calpoly/BusinessAnalytics/GSB503HAWKS/data/mergeData/bp_to_sth_modelData_Purchases.csv")
+```
+
+Prepare for Logistic Regression
+
+```{r}
+# Get categorical data
+bins = bp_to_sth[ ,c('X0.200_purchase', 'X200.800_purchase','X800._purchase','no_purchase')]
+bp_to_sth_no_bins <- bp_to_sth[, !colnames(bp_to_sth) %in% colnames(bins)]
+# Convert target variable to factor
+bp_to_sth$CONVERSION <- as.factor(bp_to_sth$CONVERSION)
+# Select only numeric columns for scaling
+numeric_vars <- bp_to_sth_no_bins[, sapply(bp_to_sth_no_bins, is.numeric)]
+# Scale only numeric variables
+scaled_numeric_vars <- scale(numeric_vars)
+# Combine the scaled numeric data, binned data, and the categorical target variable
+bp_to_sth_scaled <- data.frame(scaled_numeric_vars, bins, CONVERSION = bp_to_sth$CONVERSION)
+```
+
+Data Partition
+
+```{r}
+# Data Partition
+set.seed(1)
+bp_to_sth_scaled$CONVERSION = as.factor(bp_to_sth_scaled$CONVERSION)
+myIndex = createDataPartition(bp_to_sth_scaled$CONVERSION, p = .6, list = FALSE)
+trainSet = bp_to_sth_scaled[myIndex,]
+valSet = bp_to_sth_scaled[-myIndex, ]
+# Set 10 folds with cross validation 
+myCtrl = trainControl(method = 'cv', number = 10)
+```
+
+Model using cross Validation
+
+```{r}
+bp_to_sth_model <- train(CONVERSION ~ ., 
+                         data = trainSet, 
+                         method = 'glm', 
+                         trControl = myCtrl)
+summary(bp_to_sth_model)
+```
+
+Calculate Metrics using Cutoff Value
+
+```{r}
+# Make predictions on the validation set (using type = "prob" for probability outputs)
+predictions <- predict(bp_to_sth_model, valSet, type = "prob")
+# Convert the predicted probabilities to binary class labels (choose a threshold, e.g., 0.5)
+predicted_classes <- ifelse(predictions[, 2] > 0.29, 1, 0)
+# Generate the confusion matrix
+conf_matrix <- confusionMatrix(as.factor(predicted_classes), as.factor(valSet$CONVERSION))
+# Print the confusion matrix
+print(conf_matrix)
+```
+
+Function for finding cutoff values
+
+```{r}
+library(pROC)
+library(ggplot2)
+
+# Make predictions on the validation set (using type = "prob" for probability outputs)
+predictions <- predict(bp_to_sth_model, valSet, type = "prob")
+# Set up a range of thresholds to test (e.g., from 0 to 1)
+thresholds <- seq(0, 1, by = 0.01)
+# Initialize vectors to store accuracy and specificity at each threshold
+accuracies <- c()
+specificities <- c()
+
+# Loop through each threshold, calculate accuracy and specificity
+for (threshold in thresholds) {
+  # Convert probabilities to class predictions based on the threshold
+  predicted_classes <- ifelse(predictions[, 2] > threshold, 1, 0)
+  # Calculate confusion matrix
+  conf_matrix <- confusionMatrix(as.factor(predicted_classes), as.factor(valSet$CONVERSION))
+  # Extract accuracy and specificity from the confusion matrix
+  accuracies <- c(accuracies, conf_matrix$overall["Accuracy"])
+  specificities <- c(specificities, conf_matrix$byClass["Specificity"])
+}
+
+# Create a data frame to plot accuracy and specificity vs. threshold
+plot_data <- data.frame(Threshold = thresholds, Accuracy = accuracies, Specificity = specificities)
+difference <- abs(accuracies - specificities)
+closest_threshold_index <- which.min(difference)
+closest_threshold <- thresholds[closest_threshold_index]
+closest_accuracy <- accuracies[closest_threshold_index]
+closest_specificity <- specificities[closest_threshold_index]
+# Print the threshold where accuracy and specificity meet
+cat("Threshold where accuracy and specificity meet:", closest_threshold, "\n")
+cat("Accuracy at this threshold:", closest_accuracy, "\n")
+cat("Specificity at this threshold:", closest_specificity, "\n")
+
+# Plot the accuracy and specificity
+ggplot(plot_data, aes(x = Threshold)) +
+  geom_line(aes(y = Accuracy, color = "Accuracy")) +
+  geom_line(aes(y = Specificity, color = "Specificity")) +
+  labs(title = "Accuracy and Specificity vs. Threshold",
+       x = "Threshold", 
+       y = "Metric Value") +
+  scale_color_manual(values = c("Accuracy" = "blue", "Specificity" = "red")) +
+  theme_minimal()
+#----------------------------------------------
+```
