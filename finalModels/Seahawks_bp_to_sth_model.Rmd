@@ -64,7 +64,7 @@ Model using cross Validation
 
 ```{r}
 # Create model and view details
-bp_to_sth_model <- suppressWarnings(train(CONVERSION ~ ., 
+bp_to_sth_model <- suppressWarnings(train(CONVERSION ~ . + , 
                          data = trainSet, 
                          method = 'glm',
                          family = "binomial",
@@ -125,6 +125,7 @@ Calculate Metrics using Cutoff Value
 ```{r}
 # Compute metrics:
 
+set.seed(1)
 # Make predictions on the validation set
 predictions <- predict(bp_to_sth_model, valSet, type = "prob")
 
@@ -162,7 +163,7 @@ baseline_customer <- data.frame(
   no_purchase = 0,
   percent_open = (0.544 - mean(numeric_vars$percent_open)) / sd(numeric_vars$percent_open),
   percent_click = (0.131 - mean(numeric_vars$percent_click)) / sd(numeric_vars$percent_click),
-  primary_purchases = (0.620 - mean(numeric_vars$primary_purchases)) / sd(numeric_vars$primary_purchases),
+  primary_purchases = (1 - mean(numeric_vars$primary_purchases)) / sd(numeric_vars$primary_purchases),
   other_purchases = (0.874 - mean(numeric_vars$other_purchases)) / sd(numeric_vars$other_purchases)
 )
 
