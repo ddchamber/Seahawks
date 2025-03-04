@@ -5,13 +5,14 @@ date: "2025-02-05"
 output: html_document
 ---
 
+### Model Creation
+
 Load Dependencies
 
 ```{r}
 library(readxl)
 library(dplyr)
 library(caret)
-library(corrplot)
 ```
 
 Load in Data
@@ -27,17 +28,18 @@ Prepare for Logistic Regression
 
 # Store categorical variables
 bins = bp_to_sth[ ,c('X0.200_purchase', 'X200.800_purchase','X800._purchase','no_purchase')]
-bins_no_redundancies <- bins[, !colnames(bins) %in% 'X800._purchase'] # for model dont need all
+bins_no_redundancies <- bins[, !(colnames(bins) == 'X800._purchase')] # for model dont need all
 
 # Create data set with only numeric variables
-bp_to_sth_no_bins <- bp_to_sth[, !colnames(bp_to_sth) %in% colnames(bins)]
+bp_to_sth_no_bins <- bp_to_sth[, setdiff(colnames(bp_to_sth), colnames(bins))]
 
 # Convert target variable to factor so it is not scaled
-bp_to_sth_no_bins$CONVERSION <- as.factor(bp_to_sth_no_bins$CONVERSION)
+bp_to_sth_no_bins$CONVERSION <- factor(bp_to_sth_no_bins$CONVERSION, levels = c(0,1))
 
 # Select only numeric columns for scaling
 numeric_vars <- bp_to_sth_no_bins[, sapply(bp_to_sth_no_bins, is.numeric)]
 scaled_numeric_vars <- scale(numeric_vars)
+scaled_numeric_vars <- as.data.frame(scaled_numeric_vars)
 
 # Combine the scaled numeric data, binned data, and the categorical target variable
 bp_to_sth_scaled <- data.frame(scaled_numeric_vars, bins_no_redundancies, CONVERSION = bp_to_sth_no_bins$CONVERSION)
@@ -64,25 +66,10 @@ Model using cross Validation
 # Create model and view details
 bp_to_sth_model <- suppressWarnings(train(CONVERSION ~ ., 
                          data = trainSet, 
-                         method = 'glm', 
+                         method = 'glm',
+                         family = "binomial",
                          trControl = myCtrl))
 summary(bp_to_sth_model)
-```
-
-Calculate Metrics using Cutoff Value
-
-```{r}
-# Compute metrics:
-
-# Make predictions on the validation set
-predictions <- predict(bp_to_sth_model, valSet, type = "prob")
-
-# Convert the predicted probabilities to binary class labels using a threshold
-predicted_classes <- ifelse(predictions[, 2] > 0.3, 1, 0)
-
-# Generate the confusion matrix
-conf_matrix <- confusionMatrix(as.factor(predicted_classes), as.factor(valSet$CONVERSION))
-print(conf_matrix)
 ```
 
 Function for finding cutoff values
@@ -131,5 +118,57 @@ ggplot(plot_data, aes(x = Threshold)) +
        y = "Metric Value") +
   scale_color_manual(values = c("Accuracy" = "blue", "Specificity" = "red")) +
   theme_minimal()
-#----------------------------------------------
+```
+
+Calculate Metrics using Cutoff Value
+
+```{r}
+# Compute metrics:
+
+# Make predictions on the validation set
+predictions <- predict(bp_to_sth_model, valSet, type = "prob")
+
+# Convert the predicted probabilities to binary class labels using a threshold
+predicted_classes <- ifelse(predictions[, 2] > 0.3, 1, 0)
+
+# Generate the confusion matrix
+conf_matrix <- confusionMatrix(as.factor(predicted_classes), as.factor(valSet$CONVERSION))
+print(conf_matrix)
+```
+
+### Prediction Analysis:
+
+```{r}
+# Find average customer:
+
+# Calculate mean for the average customer
+averages <- colMeans(numeric_vars[sapply(numeric_vars, is.numeric)], na.rm = TRUE)
+averages_df <- data.frame( Mean = round(averages, 3))
+averages_df
+
+```
+
+```{r}
+# Create a baseline customer dataframe:
+
+baseline_customer <- data.frame(
+  email_send = (200 - mean(numeric_vars$email_send)) / sd(numeric_vars$email_send),
+  forward_received = (0.971	 - mean(numeric_vars$forward_received)) / sd(numeric_vars$forward_received),
+  forward_send = (0.787	 - mean(numeric_vars$forward_send)) / sd(numeric_vars$forward_send),
+  page_view = (20.818	 - mean(numeric_vars$page_view)) / sd(numeric_vars$page_view),
+  X0.200_purchase = 0,
+  X200.800_purchase = 0,
+  X800._purchase = 1,
+  no_purchase = 0,
+  percent_open = (0.544 - mean(numeric_vars$percent_open)) / sd(numeric_vars$percent_open),
+  percent_click = (0.131 - mean(numeric_vars$percent_click)) / sd(numeric_vars$percent_click),
+  primary_purchases = (0.620 - mean(numeric_vars$primary_purchases)) / sd(numeric_vars$primary_purchases),
+  other_purchases = (0.874 - mean(numeric_vars$other_purchases)) / sd(numeric_vars$other_purchases)
+)
+
+# Predict using the logistic regression model
+baseline_prediction <- predict(bp_to_sth_model, newdata = baseline_customer, type = "prob")
+
+# Print the predicted probability of conversion
+print(baseline_prediction[, "1"])
 ```
