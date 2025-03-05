@@ -64,7 +64,7 @@ Model using cross Validation
 
 ```{r}
 # Create model and view details
-bp_to_sth_model <- suppressWarnings(train(CONVERSION ~ . + , 
+bp_to_sth_model <- suppressWarnings(train(CONVERSION ~ . + page_view*percent_open + percent_click*primary_purchases + percent_open*percent_click + forward_send*no_purchase,
                          data = trainSet, 
                          method = 'glm',
                          family = "binomial",
@@ -130,7 +130,7 @@ set.seed(1)
 predictions <- predict(bp_to_sth_model, valSet, type = "prob")
 
 # Convert the predicted probabilities to binary class labels using a threshold
-predicted_classes <- ifelse(predictions[, 2] > 0.3, 1, 0)
+predicted_classes <- ifelse(predictions[, 2] > 0.37, 1, 0)
 
 # Generate the confusion matrix
 conf_matrix <- confusionMatrix(as.factor(predicted_classes), as.factor(valSet$CONVERSION))
@@ -158,8 +158,7 @@ baseline_customer <- data.frame(
   forward_send = (0.787	 - mean(numeric_vars$forward_send)) / sd(numeric_vars$forward_send),
   page_view = (20.818	 - mean(numeric_vars$page_view)) / sd(numeric_vars$page_view),
   X0.200_purchase = 0,
-  X200.800_purchase = 0,
-  X800._purchase = 1,
+  X200.800_purchase = 1,
   no_purchase = 0,
   percent_open = (0.544 - mean(numeric_vars$percent_open)) / sd(numeric_vars$percent_open),
   percent_click = (0.131 - mean(numeric_vars$percent_click)) / sd(numeric_vars$percent_click),
