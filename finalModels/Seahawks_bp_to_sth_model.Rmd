@@ -1,27 +1,33 @@
 ---
-title: "Seahawks Logisitc Regression BP to STH"
-author: "S1"
-date: "2025-02-05"
-output: html_document
+title: "Seahawks Model BP to STH"
+author: "S1 - Charles Annis, Daniel Chamberlin, Ryan Neely, Blake Reavis, and Sam Ricafrente"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    theme: cosmo
+    fontsize: 12pt
+    highlight: default
+    df_print: paged
+    self_contained: false
+    css: /Users/dan/calpoly/BusinessAnalytics/GSB503HAWKS/styles.css
 ---
 
 ### Model Creation
 
-Load Dependencies
-
-```{r}
+```{r, echo = FALSE}
 library(readxl)
 library(dplyr)
 library(caret)
 ```
 
-Load in Data
+#### Load in Data
 
 ```{r}
 bp_to_sth <- read.csv("~/calpoly/BusinessAnalytics/GSB503HAWKS/data/finalData/bp_to_sth.csv") 
 ```
 
-Prepare for Logistic Regression
+#### Prepare for Logistic Regression
 
 ```{r}
 # Scale numerical variables for logistic regression:
@@ -45,7 +51,7 @@ scaled_numeric_vars <- as.data.frame(scaled_numeric_vars)
 bp_to_sth_scaled <- data.frame(scaled_numeric_vars, bins_no_redundancies, CONVERSION = bp_to_sth_no_bins$CONVERSION)
 ```
 
-Data Partition
+#### Data Partition
 
 ```{r}
 # Data Partition:
@@ -60,7 +66,7 @@ valSet = bp_to_sth_scaled[-myIndex, ]
 myCtrl = trainControl(method = 'cv', number = 10)
 ```
 
-Model using cross Validation
+#### Model using cross Validation
 
 ```{r}
 # Create model and view details
@@ -72,7 +78,7 @@ bp_to_sth_model <- suppressWarnings(train(CONVERSION ~ . + page_view*percent_ope
 summary(bp_to_sth_model)
 ```
 
-Function for finding cutoff values
+#### Function for finding cutoff values
 
 ```{r, warning=FALSE}
 library(pROC)
@@ -120,7 +126,7 @@ ggplot(plot_data, aes(x = Threshold)) +
   theme_minimal()
 ```
 
-Calculate Metrics using Cutoff Value
+#### Calculate Metrics using Cutoff Value
 
 ```{r}
 # Compute metrics:
@@ -153,16 +159,16 @@ averages_df
 # Create a baseline customer dataframe:
 
 baseline_customer <- data.frame(
-  email_send = (200 - mean(numeric_vars$email_send)) / sd(numeric_vars$email_send),
+  email_send = (202 - mean(numeric_vars$email_send)) / sd(numeric_vars$email_send),
   forward_received = (0.971	 - mean(numeric_vars$forward_received)) / sd(numeric_vars$forward_received),
   forward_send = (0.787	 - mean(numeric_vars$forward_send)) / sd(numeric_vars$forward_send),
   page_view = (20.818	 - mean(numeric_vars$page_view)) / sd(numeric_vars$page_view),
-  X0.200_purchase = 0,
-  X200.800_purchase = 1,
+  X0.200_purchase = 1,
+  X200.800_purchase = 0,
   no_purchase = 0,
   percent_open = (0.544 - mean(numeric_vars$percent_open)) / sd(numeric_vars$percent_open),
   percent_click = (0.131 - mean(numeric_vars$percent_click)) / sd(numeric_vars$percent_click),
-  primary_purchases = (1 - mean(numeric_vars$primary_purchases)) / sd(numeric_vars$primary_purchases),
+  primary_purchases = (0.620 - mean(numeric_vars$primary_purchases)) / sd(numeric_vars$primary_purchases),
   other_purchases = (0.874 - mean(numeric_vars$other_purchases)) / sd(numeric_vars$other_purchases)
 )
 
